@@ -3,7 +3,7 @@ import {IBuyer, TPayment} from "../../types";
 export class Buyer implements IBuyer {
     address: string = '';
     email: string = '';
-    payment: TPayment = '';
+    payment: TPayment = 'online';
     phone: string = '';
 
     setBuyerData(buyer: Partial<IBuyer>): void {
@@ -25,7 +25,7 @@ export class Buyer implements IBuyer {
     clearData(): void {
         this.address = '';
         this.email = '';
-        this.payment = '';
+        this.payment = 'online';
         this.phone = '';
     }
 

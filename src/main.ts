@@ -4,7 +4,6 @@ import {WebLarekAPI} from "./components/WebLarekAPI";
 import {API_URL, CDN_URL} from "./utils/constants";
 import {cloneTemplate, ensureElement} from "./utils/utils";
 import {EventEmitter} from "./components/base/Events";
-import {AppData} from "./components/AppData";
 import {Modal} from "./components/common/Modal";
 import {Basket} from "./components/common/Basket";
 import {Contacts} from "./components/Contacts";
@@ -13,6 +12,9 @@ import {IProduct, OrderForm} from "./types";
 import {Card} from "./components/Card";
 import {Order} from "./components/Order";
 import {Page} from "./components/Page";
+import {Buyer} from "./components/models/Buyer";
+import {Cart} from "./components/models/Cart";
+import {Catalog} from "./components/models/Catalog";
 
 const api = new WebLarekAPI(CDN_URL, API_URL);
 
@@ -21,46 +23,36 @@ const cardPreviewTemplate = ensureElement<HTMLTemplateElement>('#card-preview');
 const cardBasketTemplate = ensureElement<HTMLTemplateElement>('#card-basket');
 
 const events = new EventEmitter();
-const appData = new AppData(events);
+const buyer = new Buyer();
+const cart = new Cart();
+const catalog = new Catalog();
 
 const modal = new Modal(events, ensureElement<HTMLElement>('#modal-container'));
 const page = new Page(events, document.body);
 const basket = new Basket(events);
-const orderForm = new Order(events, cloneTemplate(ensureElement<HTMLTemplateElement>('#order')));
+const orderForm = new Order(events, cloneTemplate(ensureElement<HTMLTemplateElement>('#order')), 'online');
 const contactsForm = new Contacts(events, cloneTemplate(ensureElement<HTMLTemplateElement>('#contacts')));
 
 events.on('contacts:submit', () => {
     const payload = {
-        payment: appData.buyer.payment,
-        email: appData.buyer.email,
-        phone: appData.buyer.phone,
-        address: appData.buyer.address,
-        total: appData.order.total,
-        items: appData.order.items
+        payment: buyer.payment,
+        email: buyer.email,
+        phone: buyer.phone,
+        address: buyer.address,
+        total: cart.getTotalPrice(),
+        items: cart.getProductList().map(p => p.id)
     };
     api.orderProducts(payload)
-        .then((result) => {
-            const success = new Success(
-                cloneTemplate(ensureElement<HTMLTemplateElement>('#success')),
-                {
-                    onClick: () => {
-                        modal.close();
-                        appData.clearOrder();
-                    }
-                }
-            );
-
-            modal.render({
-                content: success.render(result)
+        .then(() => {
+            const success = new Success(cloneTemplate(ensureElement<HTMLTemplateElement>('#success')), {
+                onClick: () => modal.close()
             });
-            appData.clearOrder();
-            appData.clearBuyer();
+            modal.render({content: success.render({total: payload.total})});
+            cart.clearCart();
+            buyer.clearData();
         })
-        .catch(err => {
-            console.error(err);
-        });
+        .catch(err => console.error(err));
 });
-
 
 events.on('order:open', () => {
     modal.render({
@@ -71,7 +63,7 @@ events.on('order:open', () => {
             errors: []
         })
     });
-})
+});
 
 events.on('order:submit', () => {
     modal.render({
@@ -82,96 +74,88 @@ events.on('order:submit', () => {
             errors: []
         })
     });
-})
+});
 
 events.on('order:ready', () => {
     contactsForm.valid = true;
 });
 
-events.on(/^order\.\w+:change$/, (data: { field: keyof OrderForm, value: string }) => {
-    appData.setBuyerField(data.field, data.value);
+events.on(/^order\.\w+:change$/, (data: { field: keyof OrderForm; value: string }) => {
+    if (data.field === 'payment') buyer.payment = data.value as any;
+    else buyer.address = data.value;
+
+    const orderErrors = buyer.validateBuyerData().filter(e => e.includes('адрес') || e.includes('способ'));
+    orderForm.errors = orderErrors.join('; ');
+    orderForm.valid = orderErrors.length === 0;
 });
 
-events.on(/^contacts\..*:change/, (data: { field: keyof OrderForm, value: string }) => {
-    appData.setBuyerField(data.field, data.value);
+events.on(/^contacts\..*:change/, (data: { field: keyof OrderForm; value: string }) => {
+    if (data.field === 'email') buyer.email = data.value;
+    if (data.field === 'phone') buyer.phone = data.value;
+
+    const contactErrors = buyer.validateBuyerData().filter(e => e.includes('почту') || e.includes('номер'));
+    contactsForm.errors = contactErrors.join('; ');
+    contactsForm.valid = contactErrors.length === 0;
 });
 
-events.on('formErrors:change', (errors: Partial<OrderForm>) => {
-    const {payment, address, email, phone} = errors;
-    orderForm.valid = !payment && !address;
-    orderForm.errors = Object.values({payment, address}).filter(i => !!i).join('; ');
-    contactsForm.errors = Object.values({email, phone}).filter(i => !!i).join('; ');
-});
 
 events.on('basket:open', () => {
-    modal.render({
-        content: basket.render()
-    });
+    modal.render({content: basket.render()});
 });
 
 events.on('modal:open', () => {
     page.locked = true;
 });
-
 events.on('modal:close', () => {
     page.locked = false;
-    appData.clearBuyer();
+    buyer.clearData();
 });
 
 events.on('card:select', (item: IProduct) => {
-    appData.setPreview(item);
+    modal.render({content: renderPreviewCard(item)});
 });
 
 events.on('items:change', (items: IProduct[]) => {
-    page.catalog = items.map(item => {
+    catalog.setProductList(items);
+    page.catalog = catalog.getProductList().map(item => {
         const card = new Card(cloneTemplate(cardCatalogTemplate), {
             onClick: () => events.emit('card:select', item)
         });
         return card.render(item);
-    })
+    });
 });
 
 events.on('basket:change', () => {
-    page.counter = appData.order.items.length;
-
-    basket.items = appData.order.items.map(itemId => {
-        const item = appData.items.find(i => i.id === itemId);
-        if (!item) return null;
-
+    page.counter = cart.getProductList().length;
+    basket.items = cart.getProductList().map(item => {
         const card = new Card(cloneTemplate(cardBasketTemplate), {
-            onClick: () => appData.removeFromOrder(item)
-        });
-
-        return card.render(item);
-    }).filter(Boolean);
-
-    basket.total = appData.order.total;
-});
-
-events.on('preview:change', (item: IProduct) => {
-    if (item) {
-        const card = new Card(cloneTemplate(cardPreviewTemplate), {
             onClick: () => {
-                if (appData.inOrder(item)) {
-                    appData.removeFromOrder(item);
-                    card.button = 'В корзину';
-                } else {
-                    appData.addToOrder(item);
-                    card.button = 'Удалить из корзины';
-                }
+                cart.removeProduct(item.id);
+                events.emit('basket:change');
             }
         });
-
-        card.button = appData.inOrder(item) ? 'Удалить из корзины' : 'В корзину';
-
-        modal.render({
-            content: card.render(item)
-        });
-    } else {
-        modal.close();
-    }
+        return card.render(item);
+    });
+    basket.total = cart.getTotalPrice();
 });
 
-api.getProductList().then(appData.setItems.bind(appData)).catch(err => {
-    console.error(err)
-});
+function renderPreviewCard(item: IProduct) {
+    const card = new Card(cloneTemplate(cardPreviewTemplate), {
+        onClick: () => {
+            if (cart.hasProduct(item.id)) {
+                cart.removeProduct(item.id);
+                card.button = 'В корзину';
+            } else {
+                cart.addProduct(item);
+                card.button = 'Удалить из корзины';
+            }
+            events.emit('basket:change');
+        }
+    });
+    card.button = cart.hasProduct(item.id) ? 'Удалить из корзины' : 'В корзину';
+    return card.render(item);
+}
+
+api.getProductList()
+    .then(items => events.emit('items:change', items))
+    .catch(err => console.error(err));
