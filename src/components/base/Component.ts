@@ -1,14 +1,18 @@
-/**
- * Базовый компонент
- */
+import {IEvents} from "./Events";
+
 export abstract class Component<T> {
     protected constructor(protected readonly container: HTMLElement) {
-        // Учитывайте что код в конструкторе исполняется ДО всех объявлений в дочернем классе
+
     }
 
-    // Инструментарий для работы с DOM в дочерних компонентах
+    toggleClass(className: string) {
+        this.container.classList.toggle(className);
+    }
 
-    // Установить изображение с альтернативным текстом
+    protected setText(element: HTMLElement, value: unknown) {
+        if (element) element.textContent = String(value);
+    }
+
     protected setImage(element: HTMLImageElement, src: string, alt?: string) {
         if (element) {
             element.src = src;
@@ -18,9 +22,14 @@ export abstract class Component<T> {
         }
     }
 
-    // Вернуть корневой DOM-элемент
-    render(data?: Partial<T>): HTMLElement {
+    render(data?: T): HTMLElement {
         Object.assign(this as object, data ?? {});
         return this.container;
+    }
+}
+
+export class View<T> extends Component<T> {
+    constructor(protected readonly events: IEvents, container: HTMLElement) {
+        super(container);
     }
 }
