@@ -125,19 +125,23 @@ events.on('items:change', () => {
 events.on('basket:change', () => {
     page.counter = cart.getProductList().length;
 
-    basket.items = cart.getProductList().map((item, index) => {
-        const card = new Card(cloneTemplate(cardBasketTemplate), {
-            onClick: () => {
+    basket.items = cart.getProductList().map((item, idx) => {
+        const card = new Card(cloneTemplate(cardBasketTemplate));
+        const el = card.render(item);
+
+        const indexEl = el.querySelector<HTMLElement>('.basket__item-index');
+        if (indexEl) indexEl.textContent = String(idx + 1);
+
+        const deleteButton = el.querySelector<HTMLButtonElement>('.basket__item-delete');
+        if (deleteButton) {
+            deleteButton.addEventListener('click', (e) => {
+                e.stopPropagation();
                 cart.removeProduct(item.id);
                 events.emit('basket:change');
-                events.emit('preview:update');
-            }
-        });
-        const element = card.render(item);
-        const indexElement = element.querySelector<HTMLElement>('.basket__item-index');
-        if (indexElement) indexElement.textContent = String(index + 1);
+            });
+        }
 
-        return element;
+        return el;
     });
 
     basket.total = cart.getTotalPrice();
