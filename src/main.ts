@@ -24,14 +24,15 @@ const cardBasketTemplate = ensureElement<HTMLTemplateElement>('#card-basket');
 
 const events = new EventEmitter();
 const buyer = new Buyer();
-const cart = new Cart();
-const catalog = new Catalog();
+const cart = new Cart(events);
+const catalog = new Catalog(events);
 
 const modal = new Modal(events, ensureElement<HTMLElement>('#modal-container'));
 const page = new Page(events, document.body);
 const basket = new Basket(events);
 const orderForm = new Order(events, cloneTemplate(ensureElement<HTMLTemplateElement>('#order')), 'online');
 const contactsForm = new Contacts(events, cloneTemplate(ensureElement<HTMLTemplateElement>('#contacts')));
+const success = new Success(cloneTemplate(ensureElement<HTMLTemplateElement>('#success')), {onClick: () => modal.close()});
 
 events.on('contacts:submit', () => {
     const payload = {
@@ -44,9 +45,6 @@ events.on('contacts:submit', () => {
     };
     api.orderProducts(payload)
         .then(() => {
-            const success = new Success(cloneTemplate(ensureElement<HTMLTemplateElement>('#success')), {
-                onClick: () => modal.close()
-            });
             modal.render({content: success.render({total: payload.total})});
             cart.clearCart();
             buyer.clearData();
@@ -108,18 +106,17 @@ events.on('modal:open', () => {
 });
 events.on('modal:close', () => {
     page.locked = false;
-    buyer.clearData();
 });
 
 events.on('card:select', (item: IProduct) => {
     modal.render({content: renderPreviewCard(item)});
+    events.emit('preview:update');
 });
 
-events.on('items:change', (items: IProduct[]) => {
-    catalog.setProductList(items);
+events.on('items:change', () => {
     page.catalog = catalog.getProductList().map(item => {
         const card = new Card(cloneTemplate(cardCatalogTemplate), {
-            onClick: () => events.emit('card:select', item)
+            onClick: () => catalog.setSelectedProduct(item)
         });
         return card.render(item);
     });
@@ -127,35 +124,62 @@ events.on('items:change', (items: IProduct[]) => {
 
 events.on('basket:change', () => {
     page.counter = cart.getProductList().length;
-    basket.items = cart.getProductList().map(item => {
+
+    basket.items = cart.getProductList().map((item, index) => {
         const card = new Card(cloneTemplate(cardBasketTemplate), {
             onClick: () => {
                 cart.removeProduct(item.id);
                 events.emit('basket:change');
+                events.emit('preview:update');
             }
         });
-        return card.render(item);
+        const element = card.render(item);
+        const indexElement = element.querySelector<HTMLElement>('.basket__item-index');
+        if (indexElement) indexElement.textContent = String(index + 1);
+
+        return element;
     });
+
     basket.total = cart.getTotalPrice();
 });
+
+events.on('preview:update', () => {
+    const selectedProduct = catalog.getSelectedProduct();
+    if (selectedProduct) {
+        const card = new Card(cloneTemplate(cardPreviewTemplate), {
+            onClick: () => {
+                if (cart.hasProduct(selectedProduct.id)) {
+                    cart.removeProduct(selectedProduct.id);
+                } else {
+                    cart.addProduct(selectedProduct);
+                }
+                events.emit('preview:update');
+            }
+        });
+        card.button = cart.hasProduct(selectedProduct.id) ? 'Удалить из корзины' : 'В корзину';
+
+        modal.render({
+            content: card.render(selectedProduct)
+        });
+
+        return card.render(selectedProduct);
+    }
+})
 
 function renderPreviewCard(item: IProduct) {
     const card = new Card(cloneTemplate(cardPreviewTemplate), {
         onClick: () => {
-            if (cart.hasProduct(item.id)) {
-                cart.removeProduct(item.id);
-                card.button = 'В корзину';
-            } else {
-                cart.addProduct(item);
-                card.button = 'Удалить из корзины';
-            }
-            events.emit('basket:change');
+            if (cart.hasProduct(item.id)) cart.removeProduct(item.id);
+            else cart.addProduct(item);
         }
     });
     card.button = cart.hasProduct(item.id) ? 'Удалить из корзины' : 'В корзину';
+
     return card.render(item);
 }
 
 api.getProductList()
-    .then(items => events.emit('items:change', items))
+    .then(items => {
+        catalog.setProductList(items);
+    })
     .catch(err => console.error(err));

@@ -1,6 +1,7 @@
 import {Component} from "./base/Component";
 import {IProduct} from "../types";
 import {bem, ensureElement} from "../utils/utils";
+import {categoryMap} from "../utils/constants";
 
 interface ICardActions {
     onClick: (event: MouseEvent) => void;
@@ -22,9 +23,13 @@ export class Card extends Component<IProduct> {
         this._title = ensureElement<HTMLElement>('.card__title', container);
         this._price = ensureElement<HTMLElement>('.card__price', container);
 
+        // @ts-ignore
         this._category = container.querySelector('.card__category');
+        // @ts-ignore
         this._button = container.querySelector('.card__button');
+        // @ts-ignore
         this._image = container.querySelector('.card__image');
+        // @ts-ignore
         this._description = container.querySelector('.card__text, .card__description');
 
         if (actions?.onClick) {
@@ -53,13 +58,33 @@ export class Card extends Component<IProduct> {
         return this._title.textContent || '';
     }
 
-    set price(value: number) {
-        this.setText(this._price, value ? `${value} синапсов` : 'Бесценно')
-        if (this._button) this._button.disabled = !value;
+    set price(value: number | null) {
+        if (!this._price) return;
+
+        if (value == null) {
+            this.setText(this._price, 'Бесценно');
+            if (this._button && !this._button.classList.contains('basket__item-delete')) {
+                this._button.textContent = 'Недоступно';
+                this._button.disabled = true;
+            }
+        } else {
+            this.setText(this._price, `${value} синапсов`);
+            if (this._button && !this._button.classList.contains('basket__item-delete')) {
+                this._button.disabled = false;
+                if (!this._button.textContent || this._button.textContent === 'Недоступно') {
+                    this._button.textContent = 'В корзину';
+                }
+            }
+        }
     }
+
 
     set category(value: string) {
         this.setText(this._category, value);
+        if (!this._category) return;
+        Object.values(categoryMap).forEach(c => this._category.classList.remove(c));
+        const categoryClass = categoryMap[value.toLowerCase() as keyof typeof categoryMap];
+        if (categoryClass) this._category.classList.add(categoryClass);
     }
 
     set image(value: string) {

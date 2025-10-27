@@ -1,7 +1,13 @@
 import {IProduct} from "../../types";
+import {EventEmitter} from "../base/Events";
 
 export class Cart {
     productList: IProduct [] = [];
+    private events: EventEmitter;
+
+    constructor(events: EventEmitter) {
+        this.events = events;
+    }
 
     getProductList(): IProduct [] {
         return this.productList;
@@ -9,10 +15,12 @@ export class Cart {
 
     addProduct(product: IProduct): void {
         this.productList.push(product);
+        this.events.emit('basket:change');
     }
 
     removeProduct(id: string): void {
         this.productList = this.productList.filter(c => c.id !== id);
+        this.events.emit('basket:change');
     }
 
     getTotalPrice(): number {
@@ -21,6 +29,7 @@ export class Cart {
 
     clearCart(): void {
         this.productList = [];
+        this.events.emit('basket:change');
     }
 
     hasProduct(id: string): boolean {
