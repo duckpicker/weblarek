@@ -13,11 +13,9 @@ export class CardPreview extends Card {
         this._button.addEventListener("click", (e: MouseEvent) => {
             e.stopPropagation();
             if (this._inCart) {
-                console.log('basked:remove');
                 this.events.emit('basked:remove', {id: this.id});
             }
             else {
-                console.log('basked:add');
                 this.events.emit('basked:add', {id: this.id});
             }
         });

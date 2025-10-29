@@ -116,7 +116,6 @@ events.on('card:select', (item: IProduct) => {
     if (!product) return;
     if (!product.price) cardPreview.disable();
     else cardPreview.inCart = cart.hasProduct(item.id);
-    console.log(cart.hasProduct(item.id));
     modal.render({content: cardPreview.render(product)})
 });
 
