@@ -15,6 +15,7 @@ import {Page} from "./components/Page";
 import {Buyer} from "./components/models/Buyer";
 import {Cart} from "./components/models/Cart";
 import {Catalog} from "./components/models/Catalog";
+import {CardPreview} from "./components/CardPreview";
 
 const api = new WebLarekAPI(CDN_URL, API_URL);
 
@@ -33,6 +34,7 @@ const basket = new Basket(events);
 const orderForm = new Order(events, cloneTemplate(ensureElement<HTMLTemplateElement>('#order')), 'online');
 const contactsForm = new Contacts(events, cloneTemplate(ensureElement<HTMLTemplateElement>('#contacts')));
 const success = new Success(cloneTemplate(ensureElement<HTMLTemplateElement>('#success')), {onClick: () => modal.close()});
+
 
 events.on('contacts:submit', () => {
     const payload = {
@@ -96,7 +98,6 @@ events.on(/^contacts\..*:change/, (data: { field: keyof OrderForm; value: string
     contactsForm.valid = contactErrors.length === 0;
 });
 
-
 events.on('basket:open', () => {
     modal.render({content: basket.render()});
 });
@@ -104,83 +105,64 @@ events.on('basket:open', () => {
 events.on('modal:open', () => {
     page.locked = true;
 });
+
 events.on('modal:close', () => {
     page.locked = false;
 });
 
 events.on('card:select', (item: IProduct) => {
-    modal.render({content: renderPreviewCard(item)});
-    events.emit('preview:update');
+    const cardPreview = new CardPreview(events, cloneTemplate(cardPreviewTemplate));
+    const product = catalog.getProductById(item.id);
+    if (!product) return;
+    if (!product.price) cardPreview.disable();
+    else cardPreview.inCart = cart.hasProduct(item.id);
+    console.log(cart.hasProduct(item.id));
+    modal.render({content: cardPreview.render(product)})
 });
 
 events.on('items:change', () => {
     page.catalog = catalog.getProductList().map(item => {
         const card = new Card(cloneTemplate(cardCatalogTemplate), {
-            onClick: () => catalog.setSelectedProduct(item)
+            onClick: () => events.emit('card:select', item)
         });
         return card.render(item);
     });
 });
 
+events.on('basked:add', ({id}: {id: string}) => {
+    const product = catalog.getProductById(id);
+    if (product) {
+        cart.addProduct(product);
+        events.emit('card:select', product);
+    }
+});
+
+events.on('basked:remove', ({id}: {id: string}) => {
+    const product = catalog.getProductById(id);
+    if (product) {
+        cart.removeProduct(product.id);
+        events.emit('card:select', product);
+    }
+});
+
 events.on('basket:change', () => {
-    page.counter = cart.getProductList().length;
+    const products = cart.getProductList();
 
-    basket.items = cart.getProductList().map((item, idx) => {
+    page.counter = products.length;
+
+    basket.items = products.map((item, idx) => {
         const card = new Card(cloneTemplate(cardBasketTemplate));
-        const el = card.render(item);
+        card.render(item);
+        card.index = idx + 1;
 
-        const indexEl = el.querySelector<HTMLElement>('.basket__item-index');
-        if (indexEl) indexEl.textContent = String(idx + 1);
+        card.onDelete = () => cart.removeProduct(item.id);
 
-        const deleteButton = el.querySelector<HTMLButtonElement>('.basket__item-delete');
-        if (deleteButton) {
-            deleteButton.addEventListener('click', (e) => {
-                e.stopPropagation();
-                cart.removeProduct(item.id);
-                events.emit('basket:change');
-            });
-        }
-
-        return el;
+        return card.render();
     });
 
     basket.total = cart.getTotalPrice();
 });
 
-events.on('preview:update', () => {
-    const selectedProduct = catalog.getSelectedProduct();
-    if (selectedProduct) {
-        const card = new Card(cloneTemplate(cardPreviewTemplate), {
-            onClick: () => {
-                if (cart.hasProduct(selectedProduct.id)) {
-                    cart.removeProduct(selectedProduct.id);
-                } else {
-                    cart.addProduct(selectedProduct);
-                }
-                events.emit('preview:update');
-            }
-        });
-        card.button = cart.hasProduct(selectedProduct.id) ? 'Удалить из корзины' : 'В корзину';
-
-        modal.render({
-            content: card.render(selectedProduct)
-        });
-
-        return card.render(selectedProduct);
-    }
-})
-
-function renderPreviewCard(item: IProduct) {
-    const card = new Card(cloneTemplate(cardPreviewTemplate), {
-        onClick: () => {
-            if (cart.hasProduct(item.id)) cart.removeProduct(item.id);
-            else cart.addProduct(item);
-        }
-    });
-    card.button = cart.hasProduct(item.id) ? 'Удалить из корзины' : 'В корзину';
-
-    return card.render(item);
-}
 
 api.getProductList()
     .then(items => {

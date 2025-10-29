@@ -64,7 +64,7 @@ export class Card extends Component<IProduct> {
         if (value == null) {
             this.setText(this._price, 'Бесценно');
             if (this._button && !this._button.classList.contains('basket__item-delete')) {
-                this._button.textContent = 'Недоступно';
+                this.button = 'Недоступно';
                 this._button.disabled = true;
             }
         } else {
@@ -72,12 +72,11 @@ export class Card extends Component<IProduct> {
             if (this._button && !this._button.classList.contains('basket__item-delete')) {
                 this._button.disabled = false;
                 if (!this._button.textContent || this._button.textContent === 'Недоступно') {
-                    this._button.textContent = 'В корзину';
+                    this.button = 'В корзину';
                 }
             }
         }
     }
-
 
     set category(value: string) {
         this.setText(this._category, value);
@@ -97,5 +96,18 @@ export class Card extends Component<IProduct> {
 
     set button(value: string) {
         this.setText(this._button, value)
+    }
+
+    set index(value: number) {
+        const el = this.container.querySelector('.basket__item-index');
+        if (el) el.textContent = String(value);
+    }
+
+    set onDelete(handler: () => void) {
+        const btn = this.container.querySelector('.basket__item-delete');
+        if (btn) btn.addEventListener('click', e => {
+            e.stopPropagation();
+            handler();
+        });
     }
 }
