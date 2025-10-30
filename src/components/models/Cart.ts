@@ -1,5 +1,6 @@
 import {IProduct} from "../../types";
 import {EventEmitter} from "../base/Events";
+import {CardPreview} from "../CardPreview";
 
 export class Cart {
     productList: IProduct [] = [];
@@ -13,14 +14,14 @@ export class Cart {
         return this.productList;
     }
 
-    addProduct(product: IProduct): void {
+    addProduct(product: IProduct, card?: CardPreview): void {
         this.productList.push(product);
-        this.events.emit('basket:change');
+        this.events.emit('basket:change', {card: card});
     }
 
-    removeProduct(id: string): void {
+    removeProduct(id: string, card?: CardPreview): void {
         this.productList = this.productList.filter(c => c.id !== id);
-        this.events.emit('basket:change');
+        this.events.emit('basket:change', {card: card});
     }
 
     getTotalPrice(): number {

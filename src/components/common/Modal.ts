@@ -37,6 +37,10 @@ export class Modal extends View<IModalData> {
         this.events.emit('modal:close');
     }
 
+    isOpen(): boolean {
+        return this.container.classList.contains('modal_active');
+    }
+
     render(data: IModalData): HTMLElement {
         super.render(data);
         this.open();

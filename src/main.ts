@@ -128,23 +128,17 @@ events.on('items:change', () => {
     });
 });
 
-events.on('basked:add', ({id}: {id: string}) => {
-    const product = catalog.getProductById(id);
-    if (product) {
-        cart.addProduct(product);
-        events.emit('card:select', product);
-    }
+events.on('basked:add', ({card}: {card: CardPreview}) => {
+    const product = catalog.getProductById(card.id);
+    if (product) cart.addProduct(product, card);
 });
 
-events.on('basked:remove', ({id}: {id: string}) => {
-    const product = catalog.getProductById(id);
-    if (product) {
-        cart.removeProduct(product.id);
-        events.emit('card:select', product);
-    }
+events.on('basked:remove', ({card}: {card: CardPreview}) => {
+    const product = catalog.getProductById(card.id);
+    if (product) cart.removeProduct(product.id, card);
 });
 
-events.on('basket:change', () => {
+events.on('basket:change', (data?: {card?: CardPreview}) => {
     const products = cart.getProductList();
 
     page.counter = products.length;
@@ -160,6 +154,8 @@ events.on('basket:change', () => {
     });
 
     basket.total = cart.getTotalPrice();
+
+    if (modal.isOpen() && data?.card) data.card.inCart = cart.hasProduct(data.card.id);
 });
 
 

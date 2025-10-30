@@ -13,17 +13,17 @@ export class CardPreview extends Card {
         this._button.addEventListener("click", (e: MouseEvent) => {
             e.stopPropagation();
             if (this._inCart) {
-                this.events.emit('basked:remove', {id: this.id});
+                this.events.emit('basked:remove', {card: this});
             }
             else {
-                this.events.emit('basked:add', {id: this.id});
+                this.events.emit('basked:add', {card: this});
             }
         });
     }
 
     set inCart(value: boolean) {
         this._inCart = value;
-        this._button.textContent = value ? "Удалить из корзины" : "Купить";
+        this.button = this._inCart ? "Удалить из корзины" : "Купить";
     }
 
     disable() {

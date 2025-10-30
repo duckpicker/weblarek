@@ -72,7 +72,7 @@ export class Card extends Component<IProduct> {
             if (this._button && !this._button.classList.contains('basket__item-delete')) {
                 this._button.disabled = false;
                 if (!this._button.textContent || this._button.textContent === 'Недоступно') {
-                    this.button = 'В корзину';
+                    this.button = 'Купить';
                 }
             }
         }
