@@ -111,12 +111,7 @@ events.on('modal:close', () => {
 });
 
 events.on('card:select', (item: IProduct) => {
-    const cardPreview = new CardPreview(events, cloneTemplate(cardPreviewTemplate));
-    const product = catalog.getProductById(item.id);
-    if (!product) return;
-    if (!product.price) cardPreview.disable();
-    else cardPreview.inCart = cart.hasProduct(item.id);
-    modal.render({content: cardPreview.render(product)})
+    catalog.setSelectedProduct(item);
 });
 
 events.on('items:change', () => {
@@ -156,6 +151,23 @@ events.on('basket:change', (data?: {card?: CardPreview}) => {
     basket.total = cart.getTotalPrice();
 
     if (modal.isOpen() && data?.card) data.card.inCart = cart.hasProduct(data.card.id);
+});
+
+events.on('preview:update', (product: IProduct) => {
+    const cardPreview = new CardPreview(
+        events,
+        cloneTemplate(cardPreviewTemplate)
+    );
+
+    if (!product.price) {
+        cardPreview.disable();
+    } else {
+        cardPreview.inCart = cart.hasProduct(product.id);
+    }
+
+    modal.render({
+        content: cardPreview.render(product)
+    });
 });
 
 
